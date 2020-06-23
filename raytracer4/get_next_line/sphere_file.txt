@@ -1,0 +1,19 @@
+-add: camera
+from: [0, 0, -500]
+to: [0, 0, 0]
+
+-add: light
+position: [-500, 500, -500]
+intensity: [255, 255, 255664636]
+
+-add: sphere
+translate: [250, 0, 0]
+
+-add: sphere
+translate: [0, 250, 0]
+
+-add: cylinder
+translate: [-250, 0, 250]
+
+-add: cylinder
+translate: [-150, 0, 250]

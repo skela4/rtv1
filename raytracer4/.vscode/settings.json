@@ -1,0 +1,15 @@
+{
+	"files.associations": {
+		"__bit_reference": "c",
+		"algorithm": "c",
+		"iterator": "c",
+		"random": "c",
+		"stdlib.h": "c",
+		"unistd.h": "c",
+		"rt.h": "c",
+		"__node_handle": "c",
+		"queue": "c",
+		"stack": "c",
+		"libft.h": "c"
+	}
+}

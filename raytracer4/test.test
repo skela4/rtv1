@@ -1,0 +1,323 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   test.c                                             :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: aahizi-e <marvin@42.fr>                    +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2020/04/27 15:47:52 by aahizi-e          #+#    #+#             */
+/*   Updated: 2020/05/02 07:07:57 by aahizi-e         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
+
+/**
+ * Matrix (N*N) multiplication with multiple threads.
+ */
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/time.h>
+#include <pthread.h>
+
+int size, num_threads;
+double **matrix1, **matrix2, **matrix3;
+
+double ** allocate_matrix( int size )
+{
+  /* Allocate 'size' * 'size' doubles contiguously. */
+  double * vals = (double *) malloc( size * size * sizeof(double) );
+
+  /* Allocate array of double* with size 'size' */
+  double ** ptrs = (double **) malloc( size * sizeof(double*) );
+
+  int i;
+  for (i = 0; i < size; ++i) {
+    ptrs[ i ] = &vals[ i * size ];
+  }
+
+  return ptrs;
+}
+
+void init_matrix( double **matrix, int size )
+{
+  int i, j;
+
+  for (i = 0; i < size; ++i) {
+    for (j = 0; j < size; ++j) {
+      matrix[ i ][ j ] = 1.0;
+    }
+  }
+}
+
+void print_matrix( double **matrix, int size )
+{
+  int i, j;
+
+  for (i = 0; i < size; ++i) {
+    for (j = 0; j < size-1; ++j) {
+      printf( "%lf, ", matrix[ i ][ j ] );
+    }
+    printf( "%lf", matrix[ i ][ j ] );
+    putchar( '\n' );
+  }
+}
+
+/**
+ * Thread routine.
+ * Each thread works on a portion of the 'matrix1'.
+ * The start and end of the portion depend on the 'arg' which
+ * is the ID assigned to threads sequentially.
+ */
+void * worker( void *arg )
+{
+  int i, j, k, tid, portion_size, row_start, row_end;
+  double sum;
+
+  tid = *(int *)(arg); // get the thread ID assigned sequentially.
+  portion_size = size / num_threads;
+  row_start = tid * portion_size;
+  row_end = (tid+1) * portion_size;
+
+  for (i = row_start; i < row_end; ++i) { // hold row index of 'matrix1'
+    for (j = 0; j < size; ++j) { // hold column index of 'matrix2'
+      sum = 0; // hold value of a cell
+      /* one pass to sum the multiplications of corresponding cells
+	 in the row vector and column vector. */
+      for (k = 0; k < size; ++k) {
+	sum += matrix1[ i ][ k ] * matrix2[ k ][ j ];
+      }
+      matrix3[ i ][ j ] = sum;
+    }
+  }
+}
+
+int main( int argc, char *argv[] )
+{
+  int i;
+  double sum = 0;
+  struct timeval tstart, tend;
+  double exectime;
+  pthread_t * threads;
+
+  if (argc != 3) {
+    fprintf( stderr, "%s <matrix size> <number of threads>\n", argv[0], argv[1] );
+    return -1;
+  }
+
+  size = atoi( argv[1] );
+  num_threads = atoi( argv[2] );
+
+  if ( size % num_threads != 0 ) {
+    fprintf( stderr, "size %d must be a multiple of num of threads %d\n",
+	     size, num_threads );
+    return -1;
+  }
+
+  threads = (pthread_t *) malloc( num_threads * sizeof(pthread_t) );
+
+  matrix1 = allocate_matrix( size );
+  matrix2 = allocate_matrix( size );
+  matrix3 = allocate_matrix( size );
+
+  init_matrix( matrix1, size );
+  init_matrix( matrix2, size );
+
+  if ( size <= 10 ) {
+    printf( "Matrix 1:\n" );
+    print_matrix( matrix1, size );
+    printf( "Matrix 2:\n" );
+    print_matrix( matrix2, size );
+  }
+
+  gettimeofday( &tstart, NULL );
+  for ( i = 0; i < num_threads; ++i ) {
+    int *tid;
+    tid = (int *) malloc( sizeof(int) );
+    *tid = i;
+    pthread_create( &threads[i], NULL, worker, (void *)tid );
+  }
+
+  for ( i = 0; i < num_threads; ++i ) {
+    pthread_join( threads[i], NULL );
+  }
+  gettimeofday( &tend, NULL );
+
+  if ( size <= 10 ) {
+    printf( "Matrix 3:\n" );
+    print_matrix( matrix3, size );
+  }
+
+  exectime = (tend.tv_sec - tstart.tv_sec) * 1000.0; // sec to ms
+  exectime += (tend.tv_usec - tstart.tv_usec) / 1000.0; // us to ms
+
+  printf( "Number of MPI ranks: 0\tNumber of threads: %d\tExecution time:%.3lf sec\n",
+          num_threads, exectime/1000.0);
+
+  return 0;
+}
+
+// #include <stdio.h>
+// #include <stdlib.h>
+// #include <string.h>
+// #include <time.h>
+// #define	N 4
+
+// void		assign_matrix(double *a, const double *b)
+// {
+// 	a[0] = b[0];
+// 	a[1] = b[1];
+// 	a[2] = b[2];
+// 	a[3] = b[3];
+// 	a[4] = b[4];
+// 	a[5] = b[5];
+// 	a[6] = b[6];
+// 	a[7] = b[7];
+// 	a[8] = b[8];
+// 	a[9] = b[9];
+// 	a[10] = b[10];
+// 	a[11] = b[11];
+// 	a[12] = b[12];
+// 	a[13] = b[13];
+// 	a[14] = b[14];
+// 	a[15] = b[15];
+// }
+
+// void				mul_mm(double *out, double *a, double *b)
+// {
+// 	double		mult[2500];
+
+// 	mult[0] = a[0] * b[0] + a[1] * b[4] + a[2] * b[8] + a[3] * b[12];
+// 	mult[1] = a[0] * b[1] + a[1] * b[5] + a[2] * b[9] + a[3] * b[13];
+// 	mult[2] = a[0] * b[2] + a[1] * b[6] + a[2] * b[10] + a[3] * b[14];
+// 	mult[3] = a[0] * b[3] + a[1] * b[7] + a[2] * b[11] + a[3] * b[15];
+// 	mult[4] = a[4] * b[0] + a[5] * b[4] + a[6] * b[8] + a[7] * b[12];
+// 	mult[5] = a[4] * b[1] + a[5] * b[5] + a[6] * b[9] + a[7] * b[13];
+// 	mult[6] = a[4] * b[2] + a[5] * b[6] + a[6] * b[10] + a[7] * b[14];
+// 	mult[7] = a[4] * b[3] + a[5] * b[7] + a[6] * b[11] + a[7] * b[15];
+// 	mult[8] = a[8] * b[0] + a[9] * b[4] + a[10] * b[8] + a[11] * b[12];
+// 	mult[9] = a[8] * b[1] + a[9] * b[5] + a[10] * b[9] + a[11] * b[13];
+// 	mult[10] = a[8] * b[2] + a[9] * b[6] + a[10] * b[10] + a[11] * b[14];
+// 	mult[11] = a[8] * b[3] + a[9] * b[7] + a[10] * b[11] + a[11] * b[15];
+// 	mult[12] = a[12] * b[0] + a[13] * b[4] + a[14] * b[8] + a[15] * b[12];
+// 	mult[13] = a[12] * b[1] + a[13] * b[5] + a[14] * b[9] + a[15] * b[13];
+// 	mult[14] = a[12] * b[2] + a[13] * b[6] + a[14] * b[10] + a[15] * b[14];
+// 	mult[15] = a[12] * b[3] + a[13] * b[7] + a[14] * b[11] + a[15] * b[15];
+// 	assign_matrix(out, mult);
+// }
+
+// void		matmul1(double *dest, const double *lhs, const double *rhs, size_t rows, size_t mid, size_t cols)
+// {
+// 	for (size_t i = 0; i < rows; ++i)
+// 	{
+// 		for (size_t j = 0; j < cols; ++j)
+// 		{
+// 			const double *rhs_row = rhs;
+// 			double sum = 0.0;
+// 			for (size_t k = 0; k < mid; ++k)
+// 			{
+// 				sum += lhs[k] * rhs_row[j];
+// 				rhs_row += cols;
+// 			}
+// 			*dest++ = sum;
+// 		}
+// 		lhs += mid;
+// 	}
+// }
+
+// void	matmul2(double *dest, const double *lhs, const double *rhs, size_t rows, size_t mid, size_t cols)
+// {
+// 	// memset(dest, 0, rows * cols * sizeof(double));
+// 	for (size_t i = 0; i < rows; ++i)
+// 	{
+// 		const double *rhs_row = rhs;
+// 		for (size_t j = 0; j < mid; ++j)
+// 		{
+// 			for (size_t k = 0; k < cols; ++k)
+// 			{
+// 				dest[k] += lhs[j] * rhs_row[k];
+// 			}
+// 			rhs_row += cols;
+// 		}
+// 		dest += cols;
+// 		lhs += mid;
+// 	}
+// }
+
+// int main(void)
+// {
+// 	double	mat1[16] = {
+// 		8, 5, 7, 2,
+// 		2, 7, 8, 1,
+// 		10, 4, 6, 1,
+// 		4, 2, 1, 9
+// 	};
+// 	double	mat2[16] = {
+// 		8, 5, 7, 2,
+// 		2, 7, 8, 1,
+// 		10, 4, 6, 1,
+// 		4, 2, 1, 9
+// 	};
+
+// 	double	mat[16];
+
+//     clock_t t;
+// 	int		i = 0;
+// 	double time_taken;
+//     t = clock();
+// 	// while (i < 10000000)
+// 	// {
+// 		matmul1(mat, mat1, mat2, 4, 4, 4);
+// 	// 	i++;
+// 	// }
+//     t = clock() - t;
+//     time_taken = ((double)t)/CLOCKS_PER_SEC; // in seconds
+//     printf("matmul1 took %f seconds to execute \n", time_taken);
+
+// 	t = clock();
+// 	i = 0;
+// 	// while (i < 10000000)
+// 	// {
+// 		matmul2(mat, mat1, mat2, 4, 4, 4);
+// 	// 	i++;
+// 	// }
+//     t = clock() - t;
+//     time_taken = ((double)t)/CLOCKS_PER_SEC; // in seconds
+//     printf("matmul2 took %f seconds to execute \n", time_taken);
+
+// 	t = clock();
+// 	i = 0;
+// 	// while (i < 10000000)
+// 	// {
+// 		mul_mm(mat, mat1, mat2);
+// 	// 	i++;
+// 	// }
+//     t = clock() - t;
+//     time_taken = ((double)t)/CLOCKS_PER_SEC; // in seconds
+//     printf("matmul3 took %f seconds to execute \n", time_taken);
+
+// 	// matmul2(mat, mat1, mat2, 10, 10, 10);
+
+// 	return (0);
+// }
+
+// // 19, 8, 11, 1, 4, 18, 10, 5, 20, 7
+// // 9, 2, 20, 11, 6, 13, 19, 12, 1, 17
+// // 12, 1, 11, 7, 19, 8, 6, 13, 5, 9
+// // 1, 3, 2, 4, 16, 8, 15, 14, 5, 9
+// // 6, 14, 8, 15, 2, 12, 10, 17, 4, 16
+// // 9, 1, 6, 20, 15, 17, 3, 16, 13, 2
+// // 19, 13, 18, 7, 8, 15, 6, 17, 16, 10
+// // 14, 18, 1, 7, 10, 19, 5, 8, 16, 9
+// // 3, 4, 6, 17, 1, 7, 9, 2, 5, 11
+// // 17, 5, 19, 9, 4, 20, 3, 14, 6, 8
+
+// // 15, 17, 4, 18, 11, 20, 1, 2, 13, 12
+// // 19, 7, 8, 18, 15, 9, 10, 4, 11, 13
+// // 2, 9, 13, 3, 11, 16, 5, 8, 10, 14
+// // 18, 17, 3, 12, 2, 15, 20, 4, 10, 13
+// // 20, 14, 9, 17, 13, 15, 2, 19, 4, 11
+// // 18, 13, 19, 9, 17, 5, 15, 7, 8, 1
+// // 5, 11, 15, 12, 9, 14, 1, 10, 19, 4
+// // 9, 5, 15, 18, 17, 13, 2, 6, 14, 19
+// // 9, 13, 17, 4, 8, 1, 19, 6, 20, 18
+// // 3, 13, 11, 8, 15, 2, 12, 17, 16, 14
